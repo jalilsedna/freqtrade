@@ -58,7 +58,14 @@ _NUMERIC_COLS = (
 )
 
 _DEFAULT_URL = "http://127.0.0.1:8000"
-_HTTP_TIMEOUT = 20
+# /factor-history replays a multi-year panel point-in-time and can take 30-60s on the FIRST
+# (cold) call; the terminal EOD-caches it, so subsequent daily calls are fast. A tight timeout
+# makes the cold call fail and features get skipped for that training cycle. Generous default,
+# env-overridable (MT_HTTP_TIMEOUT seconds).
+_HTTP_TIMEOUT = float(os.getenv("MT_HTTP_TIMEOUT", "60"))
+# Days of daily history requested per pair. Overridable (MT_LOOKBACK_DAYS) — lower it if the
+# terminal is slow to build the panel; the model's structural/regime features want a few years.
+_DEFAULT_LOOKBACK = int(os.getenv("MT_LOOKBACK_DAYS", "1460"))
 
 # Per-process cache: {(symbol, lookback_days, include_macro, YYYY-MM-DD): DataFrame}. The
 # panel is daily and only extends once per day, so one fetch per pair per run is plenty and
@@ -96,7 +103,7 @@ def _http_get_json(url: str, token: str | None) -> dict:
 def fetch_panel(
     symbol: str,
     *,
-    lookback_days: int = 1460,
+    lookback_days: int = _DEFAULT_LOOKBACK,
     include_macro: bool = False,
 ) -> pd.DataFrame:
     """Fetch the terminal's ``/factor-history`` panel for a canonical ``symbol`` and return a
@@ -143,7 +150,7 @@ def merge_terminal_features(
     dataframe: pd.DataFrame,
     pair: str,
     *,
-    lookback_days: int = 1460,
+    lookback_days: int = _DEFAULT_LOOKBACK,
     include_macro: bool = False,
     prefix: str = "%-",
 ) -> pd.DataFrame:
