@@ -1,0 +1,35 @@
+# Market-Terminal crypto sibling — freqtrade (FreqAI) as a VPS sibling behind Caddy.
+#
+# Runs the TerminalFreqAIStrategy in DRY-RUN (disarmed) by default. Exchange keys, api_server
+# credentials, and the terminal URL are injected from .env (see .env.terminal-freqai.example)
+# via freqtrade's FREQTRADE__* env overrides — nothing secret lives in the committed config.
+#
+#   cp .env.terminal-freqai.example .env   # then fill it in (keys stay on THIS box only)
+#   docker compose -f docker-compose.terminal-freqai.yml up -d
+#
+# FreqUI + REST listen on :8080; the shared `web` Caddy network reverse-proxies it (see the
+# sample site block in docs/terminal-freqai-sibling.md). Going live is a deliberate manual
+# step: set FREQTRADE__DRY_RUN=false in .env AND provide real exchange keys, then redeploy.
+services:
+  freqtrade:
+    image: freqtradeorg/freqtrade:stable_freqai
+    container_name: terminal-freqai
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - "./user_data:/freqtrade/user_data"
+    ports:
+      # Bind to loopback on the host; Caddy (on the shared network) fronts it publicly.
+      - "127.0.0.1:8080:8080"
+    networks:
+      - web
+    command: >
+      trade
+      --strategy TerminalFreqAIStrategy
+      --freqaimodel LightGBMRegressor
+      --config /freqtrade/user_data/config_terminal_freqai.prod.json
+
+networks:
+  web:
+    external: true
