@@ -60,6 +60,44 @@ freqtrade trade \
   --config user_data/config_terminal_freqai.example.json
 ```
 
+## Deploy as a VPS sibling (Docker + Caddy) + go-live runbook
+
+Run freqtrade as its own always-on container behind the shared Caddy edge — the same pattern
+as the OpenAlice / ITB siblings. It stays **disarmed (`dry_run: true`)** until you deliberately
+flip it.
+
+```bash
+cp .env.terminal-freqai.example .env      # fill in on THIS box only (never commit it)
+#   - MT_API_URL / MT_API_TOKEN            → your terminal
+#   - FREQTRADE__API_SERVER__USERNAME/PASSWORD + JWT_SECRET_KEY (openssl rand -hex 32)
+#   - leave FREQTRADE__DRY_RUN=true and the exchange keys blank for now
+docker compose -f docker-compose.terminal-freqai.yml up -d
+docker compose -f docker-compose.terminal-freqai.yml logs -f     # watch it train + trade (paper)
+```
+
+Caddy site block (gitignored on the VPS, e.g. `deploy/sites/siblings.caddy`):
+
+```
+freqtrade.<yourdomain> {
+    reverse_proxy terminal-freqai:8080     # FreqUI + REST
+}
+```
+
+**Connect the terminal's Crypto Bot panel:** in the terminal, set Settings → Crypto Bot →
+URL = `https://freqtrade.<yourdomain>`, username/password = the `FREQTRADE__API_SERVER__*`
+creds above. The terminal then shows the bot's status/trades/P&L (read-only; it never controls
+the bot).
+
+### Staged go-live (do this yourself, deliberately)
+
+1. **Paper (default):** `dry_run: true` — live Binance data, simulated wallet. Watch FreqUI /
+   the terminal panel for a few days; confirm the model trains and the `%-mt_*` features carry
+   non-zero importance.
+2. **Live:** create Binance **spot** API keys — **trade enabled, withdrawals DISABLED,
+   IP-restricted to this box**. Put them in `.env` (`FREQTRADE__EXCHANGE__KEY/SECRET`), set
+   `FREQTRADE__DRY_RUN=false`, and redeploy. Start with small `stake_amount` and
+   `max_open_trades`. Keys never leave this box; the terminal never sees them.
+
 ## Notes
 
 - Terminal reads are **daily**; they forward-fill across intraday candles (slower macro /
