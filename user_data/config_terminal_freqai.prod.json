@@ -1,10 +1,10 @@
 {
     "$schema": "https://schema.freqtrade.io/schema.json",
-    "_comment": "PRODUCTION config for the Market-Terminal crypto sibling. DISARMED: dry_run stays true (paper on live Binance data) until YOU flip it. Exchange keys + api_server creds are injected from .env via FREQTRADE__* env vars — NEVER hardcode them here. FreqUI/REST is enabled on :8080 so the terminal's Crypto Bot panel and FreqUI can read the bot. See docs/terminal-freqai-sibling.md.",
+    "_comment": "PRODUCTION config for the Market-Terminal crypto sibling. DISARMED: dry_run stays true (paper on live Binance data) until YOU flip it. Exchange keys + api_server creds are injected from .env via FREQTRADE__* env vars — NEVER hardcode them here. FreqUI/REST is enabled on :8080 so the terminal's Crypto Bot panel and FreqUI can read the bot. Pair selection is DYNAMIC: VolumePairList picks the top-20 USDT spot pairs by 24h quote volume (refreshed every 30m), filtered for age/price/spread/stability/volatility, with stablecoins + leveraged tokens blacklisted; stake is 'unlimited' (wallet split across up to max_open_trades=10 concurrent positions). include_corr_pairlist stays static (BTC/ETH) as FreqAI informative anchors. See docs/terminal-freqai-sibling.md.",
     "trading_mode": "spot",
-    "max_open_trades": 3,
+    "max_open_trades": 10,
     "stake_currency": "USDT",
-    "stake_amount": 200,
+    "stake_amount": "unlimited",
     "tradable_balance_ratio": 0.99,
     "fiat_display_currency": "USD",
     "dry_run": true,
@@ -21,11 +21,12 @@
         "secret": "",
         "ccxt_config": {},
         "ccxt_async_config": {},
-        "pair_whitelist": [
-            "BTC/USDT",
-            "ETH/USDT"
-        ],
-        "pair_blacklist": []
+        "pair_whitelist": [],
+        "pair_blacklist": [
+            "(USDC|TUSD|BUSD|DAI|FDUSD|USDP|PAX|UST|USTC|EUR|GBP|AEUR)/USDT",
+            ".*(UP|DOWN|BULL|BEAR)/USDT",
+            "(BTCST|BTCDOM|BNBUP|BNBDOWN)/USDT"
+        ]
     },
     "entry_pricing": {
         "price_side": "same",
@@ -40,8 +41,17 @@
     },
     "pairlists": [
         {
-            "method": "StaticPairList"
-        }
+            "method": "VolumePairList",
+            "number_assets": 20,
+            "sort_key": "quoteVolume",
+            "min_value": 0,
+            "refresh_period": 1800
+        },
+        {"method": "AgeFilter", "min_days_listed": 30},
+        {"method": "PriceFilter", "min_price": 0.001},
+        {"method": "SpreadFilter", "max_spread_ratio": 0.005},
+        {"method": "RangeStabilityFilter", "lookback_days": 3, "min_rate_of_change": 0.03, "refresh_period": 1800},
+        {"method": "VolatilityFilter", "lookback_days": 3, "min_volatility": 0.02, "max_volatility": 0.75, "refresh_period": 1800}
     ],
     "freqai": {
         "enabled": true,

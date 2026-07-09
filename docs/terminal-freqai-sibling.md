@@ -100,6 +100,16 @@ the bot).
 
 ## Notes
 
+- **Pair selection is dynamic (prod config).** `config_terminal_freqai.prod.json` uses a
+  `VolumePairList` — top-20 USDT spot pairs by 24h quote volume (refreshed every 30m), filtered
+  by age/price/spread/range-stability/volatility, with stablecoins + leveraged tokens
+  blacklisted. `stake_amount: "unlimited"` splits the wallet across up to `max_open_trades: 10`
+  concurrent positions. To trade a fixed set instead, swap the first pairlist back to
+  `StaticPairList` + a `pair_whitelist`. Tune `number_assets` down if the VPS is CPU-strained
+  (FreqAI trains a model per pair every `live_retrain_hours`). `include_corr_pairlist` stays
+  static (BTC/ETH) as informative anchors. **Terminal `mt_*` features only enrich pairs also in
+  the terminal's registry** (others train candle-only, gracefully) — mirror the majors you
+  expect to trade into the terminal registry as `BASE-USD`.
 - Terminal reads are **daily**; they forward-fill across intraday candles (slower macro /
   structural context, not a per-candle trigger). The categorical label columns
   (`mt_structure_trend`, `mt_price_regime`) are dropped — FreqAI features must be numeric and
