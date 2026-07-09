@@ -100,16 +100,18 @@ the bot).
 
 ## Notes
 
-- **Pair selection is dynamic (prod config).** `config_terminal_freqai.prod.json` uses a
-  `VolumePairList` — top-20 USDT spot pairs by 24h quote volume (refreshed every 30m), filtered
-  by age/price/spread/range-stability/volatility, with stablecoins + leveraged tokens
-  blacklisted. `stake_amount: "unlimited"` splits the wallet across up to `max_open_trades: 10`
-  concurrent positions. To trade a fixed set instead, swap the first pairlist back to
-  `StaticPairList` + a `pair_whitelist`. Tune `number_assets` down if the VPS is CPU-strained
-  (FreqAI trains a model per pair every `live_retrain_hours`). `include_corr_pairlist` stays
-  static (BTC/ETH) as informative anchors. **Terminal `mt_*` features only enrich pairs also in
-  the terminal's registry** (others train candle-only, gracefully) — mirror the majors you
-  expect to trade into the terminal registry as `BASE-USD`.
+- **Pair selection is a StaticPairList of liquid majors (prod config).**
+  `config_terminal_freqai.prod.json` trades 11 USDT majors
+  (BTC/ETH/SOL/BNB/XRP/ADA/DOGE/AVAX/LINK/LTC/DOT). `stake_amount: "unlimited"` splits the
+  wallet across up to `max_open_trades: 10` concurrent positions.
+  **Why static, not a dynamic `VolumePairList`:** FreqAI pre-loads historic candle data for the
+  whitelist at startup into a fixed data drawer; a rotating pairlist swaps in pairs that aren't
+  in the drawer → `KeyError` in `data_drawer.update_historic_data` on every tick for the new
+  pairs (they never analyze/train). A stable curated universe is the FreqAI-correct way to trade
+  many pairs. To add pairs: extend `pair_whitelist` (and add the matching `BASE-USD` to the
+  terminal registry so it gets `mt_*` features — pairs outside the registry train candle-only,
+  gracefully). Tune `max_open_trades` / trim the list if the VPS is CPU-strained (FreqAI trains
+  a model per pair every `live_retrain_hours`). `include_corr_pairlist` stays static (BTC/ETH).
 - Terminal reads are **daily**; they forward-fill across intraday candles (slower macro /
   structural context, not a per-candle trigger). The categorical label columns
   (`mt_structure_trend`, `mt_price_regime`) are dropped — FreqAI features must be numeric and
